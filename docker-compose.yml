@@ -3,6 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15
+    container_name: health_postgres
     environment:
       POSTGRES_USER: health_user
       POSTGRES_PASSWORD: health_password
@@ -11,6 +12,56 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U health_user -d health_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - health_network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: health_api
+    environment:
+      DATABASE_URL: postgresql://health_user:health_password@postgres:5432/health_db
+      FASTAPI_HOST: 0.0.0.0
+      FASTAPI_PORT: 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Mount source code for development (remove for production)
+      - ./app:/app/app:ro
+    networks:
+      - health_network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: health_frontend
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+    volumes:
+      # Mount source code for development (remove for production)
+      - ./app:/app/app:ro
+    networks:
+      - health_network
+    restart: unless-stopped
+
+networks:
+  health_network:
+    driver: bridge
 
 volumes:
-  postgres_data: 
+  postgres_data:
