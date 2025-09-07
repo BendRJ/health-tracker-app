@@ -1,24 +1,52 @@
 # health-tracker-app
 Streamlit application for tracking health data and storing it in local postgres database
 
-## Project Structure
+### Service Overview
 
-```plaintext
-health_tracker/
-├── app/
-│   ├── __init__.py
-│   ├── main.py
-│   ├── database.py
-│   ├── models.py
-│   ├── schemas.py
-│   ├── crud.py
-│   ├── frontend.py
-│   └── routers/
-│       └── health.py
-├── .env
-├── docker-compose.yml
-├── start_app.sh
-└── requirements.txt
+```
+External Access (Host Machine)
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Browser → localhost:8501          Direct API → localhost:8000                  │
+│           ▲                                    ▲                                │
+└───────────┼────────────────────────────────────┼────────────────────────────────┘
+            │                                    │
+            │ Port Mapping                       │ Port Mapping
+            │ 8501:8501                          │ 8000:8000
+            ▼                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                       health_network (Docker Bridge)                            │
+│                                                                                 │
+│ ┌─────────────────────┐              ┌─────────────────────┐                    │
+│ │     frontend        │              │        api          │                    │
+│ │   (Streamlit)       │              │     (FastAPI)       │                    │
+│ │                     │    HTTP      │                     │   PostgreSQL       │
+│ │ Container:          │◄────────────►│ Container:          │◄─────────────────┐ │
+│ │ health_frontend     │ api:8000     │ health_api          │ postgres:5432    │ │
+│ │ Port: 8501          │              │ Port: 8000          │                  │ │
+│ └─────────────────────┘              └─────────────────────┘                  │ │
+│                                                                               │ │
+│                                                            ┌──────────────────┘ │
+│                                                            │                    │
+│                                                            ▼                    │
+│                                       ┌─────────────────────────┐               │
+│                                       │       postgres          │               │
+│                                       │     (PostgreSQL)        │               │
+│                                       │                         │               │
+│                                       │ Container:              │               │
+│                                       │ health_postgres         │               │
+│                                       │ Port: 5432              │               │
+│                                       │                         │               │
+│                                       │ Volume:                 │               │
+│                                       │ postgres_data           │               │
+│                                       └─────────────────────────┘               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Data Flow:
+1. User accesses Streamlit UI at localhost:8501
+2. Frontend makes HTTP requests to api:8000 (internal network)
+3. API connects to postgres:5432 for database operations
+4. PostgreSQL data persisted in named volume postgres_data
 ```
 
 ## Quick Start
@@ -185,54 +213,6 @@ The Makefile provides convenient commands for both Docker and local development:
 ## Docker Compose Architecture
 
 The Health Tracker application uses Docker Compose to orchestrate three interconnected services that work together to provide a complete web application stack. Here's how they connect and communicate:
-
-### Service Overview
-
-```
-External Access (Host Machine)
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│  Browser → localhost:8501          Direct API → localhost:8000                  │
-│           ▲                                    ▲                                │
-└───────────┼────────────────────────────────────┼────────────────────────────────┘
-            │                                    │
-            │ Port Mapping                       │ Port Mapping
-            │ 8501:8501                          │ 8000:8000
-            ▼                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                       health_network (Docker Bridge)                            │
-│                                                                                 │
-│ ┌─────────────────────┐              ┌─────────────────────┐                    │
-│ │     frontend        │              │        api          │                    │
-│ │   (Streamlit)       │              │     (FastAPI)       │                    │
-│ │                     │    HTTP      │                     │   PostgreSQL       │
-│ │ Container:          │◄────────────►│ Container:          │◄─────────────────┐ │
-│ │ health_frontend     │ api:8000     │ health_api          │ postgres:5432    │ │
-│ │ Port: 8501          │              │ Port: 8000          │                  │ │
-│ └─────────────────────┘              └─────────────────────┘                  │ │
-│                                                                               │ │
-│                                                            ┌──────────────────┘ │
-│                                                            │                    │
-│                                                            ▼                    │
-│                                       ┌─────────────────────────┐               │
-│                                       │       postgres          │               │
-│                                       │     (PostgreSQL)        │               │
-│                                       │                         │               │
-│                                       │ Container:              │               │
-│                                       │ health_postgres         │               │
-│                                       │ Port: 5432              │               │
-│                                       │                         │               │
-│                                       │ Volume:                 │               │
-│                                       │ postgres_data           │               │
-│                                       └─────────────────────────┘               │
-│                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
-
-Data Flow:
-1. User accesses Streamlit UI at localhost:8501
-2. Frontend makes HTTP requests to api:8000 (internal network)
-3. API connects to postgres:5432 for database operations
-4. PostgreSQL data persisted in named volume postgres_data
-```
 
 ### Service Interconnections
 
