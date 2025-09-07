@@ -23,8 +23,36 @@ health_tracker/
 
 ## Quick Start
 
-To start the application with one click, run:
+### Using Docker (Recommended for Production)
 
+**First time setup:**
+```bash
+make docker-build    # Build all containers
+make docker-up       # Start all services
+```
+
+**Daily development:**
+```bash
+make docker-dev      # Start with live code reloading
+```
+
+**Quick commands:**
+```bash
+make help            # See all available commands
+make docker-status   # Check container status
+make docker-logs     # View logs
+make docker-down     # Stop all services
+```
+
+### Using Local Development (Alternative)
+
+**Using Makefile:**
+```bash
+make run            # Start full application locally
+make help           # See all available commands
+```
+
+**Using Shell Script:**
 ```bash
 ./start_app.sh
 ```
@@ -62,29 +90,330 @@ This script will:
    ```
 
 ### Running the Application
-1. Start the PostgreSQL container:
-   ```bash
-   docker-compose up -d
-   ```
 
-2. Start the FastAPI backend:
-   ```bash
-   uvicorn app.main:app --reload
-   ```
+#### Docker Workflow (Recommended)
 
-3. Start the Streamlit frontend:
-   ```bash
-   streamlit run app/frontend.py
-   ```
+**Production deployment:**
+```bash
+make docker-build    # Build containers
+make docker-up       # Start all services in background
+```
+
+**Development with live reload:**
+```bash
+make docker-dev      # Start with volume mounts for code changes
+```
+
+**Individual services:**
+```bash
+make docker-status   # Check what's running
+make docker-logs     # View all logs
+make docker-down     # Stop everything
+```
+
+#### Local Development Workflow
+
+**Using Makefile:**
+```bash
+make run             # Start full application locally
+make run-api         # Start API only (includes database)
+make run-frontend    # Start frontend only
+make dev             # Development mode with auto-reload
+```
+
+**Manual setup:**
+```bash
+docker-compose up -d postgres    # Start database only
+uvicorn app.main:app --reload    # Start FastAPI backend
+streamlit run app/frontend.py    # Start Streamlit frontend
+```
+
+## Makefile Commands
+
+The Makefile provides convenient commands for both Docker and local development:
+
+### Docker Commands (Recommended)
+- `make docker-build` - Build all container images
+- `make docker-up` - Start all services with Docker
+- `make docker-dev` - Start with development volume mounts
+- `make docker-down` - Stop all Docker services
+- `make docker-logs` - View logs from all services
+- `make docker-status` - Show container status
+- `make docker-clean` - Clean up containers and images
+- `make docker-rebuild` - Rebuild and restart everything
+
+### Local Development Commands
+- `make install` - Install Python dependencies
+- `make install-dev` - Install development dependencies
+- `make run` - Start full application locally
+- `make run-api` - Start only FastAPI backend
+- `make run-frontend` - Start only Streamlit frontend
+- `make dev` - Start in development mode
+
+### Database Management
+- `make db-up` - Start PostgreSQL container only
+- `make db-down` - Stop PostgreSQL container
+- `make db-reset` - Reset database (remove all data)
+- `make db-logs` - View database logs
+
+### Development Tools
+- `make test` - Run tests
+- `make lint` - Run code linting
+- `make format` - Format code with black
+- `make clean` - Clean temporary files
+- `make compile-deps` - Compile requirements.in to requirements.txt
+
+### Utility
+- `make status` - Check service status
+- `make stop` - Stop all services
+- `make check-env` - Check if required tools are installed
+- `make help` - Show all available commands
 
 ## Usage
-- Open your browser and navigate to `http://localhost:8501` to access the Streamlit frontend.
-- Use the form to input back pain data (pain level and date).
-- View the history of recorded pain levels.
 
-## API Documentation
-- FastAPI Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+### Access the Application
+- **Frontend**: `http://localhost:8501` - Streamlit web interface
+- **API**: `http://localhost:8000` - FastAPI backend
+- **API Documentation**: `http://localhost:8000/docs` - Interactive Swagger UI
+- **Alternative API Docs**: `http://localhost:8000/redoc` - ReDoc interface
+
+### Application Features
+- Use the web form to input back pain data (pain level 1-10 and date)
+- View historical pain level entries
+- RESTful API for programmatic access to data
+
+## Docker Compose Architecture
+
+The Health Tracker application uses Docker Compose to orchestrate three interconnected services that work together to provide a complete web application stack. Here's how they connect and communicate:
+
+### Service Overview
+
+```
+External Access (Host Machine)
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Browser → localhost:8501          Direct API → localhost:8000                  │
+│           ▲                                    ▲                                │
+└───────────┼────────────────────────────────────┼────────────────────────────────┘
+            │                                    │
+            │ Port Mapping                       │ Port Mapping
+            │ 8501:8501                          │ 8000:8000
+            ▼                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                       health_network (Docker Bridge)                            │
+│                                                                                 │
+│ ┌─────────────────────┐              ┌─────────────────────┐                    │
+│ │     frontend        │              │        api          │                    │
+│ │   (Streamlit)       │              │     (FastAPI)       │                    │
+│ │                     │    HTTP      │                     │   PostgreSQL       │
+│ │ Container:          │◄────────────►│ Container:          │◄─────────────────┐ │
+│ │ health_frontend     │ api:8000     │ health_api          │ postgres:5432    │ │
+│ │ Port: 8501          │              │ Port: 8000          │                  │ │
+│ └─────────────────────┘              └─────────────────────┘                  │ │
+│                                                                               │ │
+│                                                            ┌──────────────────┘ │
+│                                                            │                    │
+│                                                            ▼                    │
+│                                       ┌─────────────────────────┐               │
+│                                       │       postgres          │               │
+│                                       │     (PostgreSQL)        │               │
+│                                       │                         │               │
+│                                       │ Container:              │               │
+│                                       │ health_postgres         │               │
+│                                       │ Port: 5432              │               │
+│                                       │                         │               │
+│                                       │ Volume:                 │               │
+│                                       │ postgres_data           │               │
+│                                       └─────────────────────────┘               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Data Flow:
+1. User accesses Streamlit UI at localhost:8501
+2. Frontend makes HTTP requests to api:8000 (internal network)
+3. API connects to postgres:5432 for database operations
+4. PostgreSQL data persisted in named volume postgres_data
+```
+
+### Service Interconnections
+
+#### 1. **PostgreSQL Database Service (`postgres`)**
+- **Role**: Data persistence layer
+- **Image**: `postgres:15`
+- **Container Name**: `health_postgres`
+- **Internal Network**: Accessible at `postgres:5432` from other services
+- **External Access**: `localhost:5432` (mapped from host)
+- **Data Storage**: Uses named volume `postgres_data` for persistence
+- **Health Check**: Monitors database readiness with `pg_isready`
+
+#### 2. **FastAPI Backend Service (`api`)**
+- **Role**: Business logic and REST API layer
+- **Build**: Custom image from `Dockerfile`
+- **Container Name**: `health_api`
+- **Dependencies**: Waits for `postgres` service to be healthy
+- **Database Connection**: `postgresql://health_user:health_password@postgres:5432/health_db`
+- **Internal Network**: Accessible at `api:8000` from frontend service
+- **External Access**: `localhost:8000` (mapped from host)
+
+#### 3. **Streamlit Frontend Service (`frontend`)**
+- **Role**: User interface and web application layer
+- **Build**: Custom image from `Dockerfile.frontend`
+- **Container Name**: `health_frontend`
+- **Dependencies**: Waits for `api` service to start
+- **API Connection**: `http://api:8000` (internal network communication)
+- **External Access**: `localhost:8501` (mapped from host)
+
+### Service Startup Sequence
+
+The services start in a specific order managed by Docker Compose dependency chains:
+
+```
+1. postgres (starts first)
+   ├── Health check: pg_isready -U health_user -d health_db
+   ├── Status: Waiting for database initialization...
+   └── Ready: Database accepts connections
+
+2. api (starts after postgres is healthy)
+   ├── Depends on: postgres (condition: service_healthy)
+   ├── Database connection: postgresql://health_user:health_password@postgres:5432/health_db
+   ├── Application startup: FastAPI server initialization
+   └── Ready: API endpoints available at api:8000
+
+3. frontend (starts after api is running)
+   ├── Depends on: api (condition: service_started)
+   ├── API connection: http://api:8000
+   ├── Streamlit startup: Web interface initialization
+   └── Ready: Web application available at frontend:8501
+```
+
+### Network Communication
+
+#### Internal Service Discovery
+- **Custom Network**: All services run on `health_network` (bridge driver)
+- **DNS Resolution**: Docker provides automatic service discovery
+  - `postgres` resolves to the database container IP
+  - `api` resolves to the FastAPI container IP
+  - `frontend` resolves to the Streamlit container IP
+
+#### Communication Flows
+1. **User → Frontend**: Browser connects to `localhost:8501`
+2. **Frontend → API**: HTTP requests to `http://api:8000/back-pain/`
+3. **API → Database**: PostgreSQL connections to `postgres:5432`
+4. **User → API** (optional): Direct API access at `localhost:8000`
+
+### Environment Configuration
+
+#### Database Service Environment
+```yaml
+POSTGRES_USER: health_user
+POSTGRES_PASSWORD: health_password
+POSTGRES_DB: health_db
+```
+
+#### API Service Environment
+```yaml
+DATABASE_URL: postgresql://health_user:health_password@postgres:5432/health_db
+FASTAPI_HOST: 0.0.0.0
+FASTAPI_PORT: 8000
+```
+
+#### Frontend Service Environment
+```yaml
+API_URL: http://api:8000
+```
+
+### Volume Mounts & Data Persistence
+
+#### Production Volumes
+- **Database Data**: `postgres_data:/var/lib/postgresql/data` (named volume)
+- **Application Code**: Embedded in container images
+
+#### Development Volumes
+- **Live Code Reload**: `./app:/app/app:ro` (read-only bind mounts)
+- **Database Data**: `postgres_data:/var/lib/postgresql/data` (persistent)
+
+### Port Mapping Strategy
+
+| Service  | Internal Port | External Port | Purpose |
+|----------|---------------|---------------|---------|
+| postgres | 5432          | 5432          | Database access (dev/debugging) |
+| api      | 8000          | 8000          | REST API endpoints |
+| frontend | 8501          | 8501          | Web application interface |
+
+### Health Checks & Reliability
+
+#### Database Health Check
+```bash
+pg_isready -U health_user -d health_db
+```
+- **Interval**: Every 10 seconds
+- **Timeout**: 5 seconds per check
+- **Retries**: 5 attempts before marking unhealthy
+
+#### Service Restart Policies
+- **API**: `unless-stopped` - Restarts automatically unless manually stopped
+- **Frontend**: `unless-stopped` - Restarts automatically unless manually stopped
+- **Database**: Default policy - Stops if container fails
+
+### Development vs Production Differences
+
+#### Development Configuration (`make docker-dev`)
+- **Volume Mounts**: Live code reload with `./app:/app/app:ro`
+- **Logging**: Foreground mode with `docker-compose up` (no -d flag)
+- **Code Changes**: Reflected immediately without rebuild
+
+#### Production Configuration (`make docker-up`)
+- **Volume Mounts**: No code volume mounts (code embedded in image)
+- **Logging**: Background mode with `docker-compose up -d`
+- **Code Changes**: Require image rebuild and container restart
+
+### Troubleshooting Common Issues
+
+#### Connection Problems
+1. **Frontend can't reach API**: Check if `api` service is healthy
+   ```bash
+   make docker-status  # Check container status
+   make docker-logs    # Check for API startup errors
+   ```
+
+2. **API can't reach Database**: Verify postgres health check
+   ```bash
+   docker-compose exec postgres pg_isready -U health_user -d health_db
+   ```
+
+3. **Services not starting**: Check dependency chain
+   ```bash
+   docker-compose ps      # Check service status
+   docker-compose logs    # View startup logs
+   ```
+
+#### Network Issues
+- Ensure all services are on the same network: `health_network`
+- Verify internal DNS resolution: `docker-compose exec api ping postgres`
+- Check port conflicts: `lsof -i :8000,8501,5432`
+
+This architecture ensures a robust, scalable, and maintainable application stack with proper service isolation, health monitoring, and development flexibility.
+
+## Architecture Overview
+
+### Docker Setup (Production)
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Streamlit     │    │    FastAPI      │    │   PostgreSQL    │
+│   Frontend      │◄──►│    Backend      │◄──►│   Database      │
+│   Port: 8501    │    │   Port: 8000    │    │   Port: 5432    │
+│   (Container)   │    │   (Container)   │    │   (Container)   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+### Local Development Setup
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Streamlit     │    │    FastAPI      │    │   PostgreSQL    │
+│   Frontend      │◄──►│    Backend      │◄──►│   Database      │
+│   Port: 8501    │    │   Port: 8000    │    │   Port: 5432    │
+│   (Local)       │    │   (Local)       │    │   (Container)   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
 
 ## Chronology of Scripts
 

@@ -22,4 +22,10 @@ app.add_middleware(
 
 # Include the health router for API endpoints
 # This router handles requests related to back pain data
-app.include_router(health.router, prefix="/api/v1") 
+app.include_router(health.router, prefix="/api/v1")
+
+# Add a simple health check endpoint
+@app.get("/health")
+def health_check():
+    """Health check endpoint for monitoring and Docker health checks."""
+    return {"status": "healthy"}

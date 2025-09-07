@@ -7,8 +7,15 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-FASTAPI_PORT = os.getenv('FASTAPI_PORT', '8000')
-FASTAPI_URL = f"http://localhost:{FASTAPI_PORT}/api/v1"
+# Check if running in Docker (API_URL env var is set) or locally
+API_URL = os.getenv('API_URL')
+if API_URL:
+    # Running in Docker - use the API container URL
+    FASTAPI_URL = f"{API_URL}/api/v1"
+else:
+    # Running locally - use localhost
+    FASTAPI_PORT = os.getenv('FASTAPI_PORT', '8000')
+    FASTAPI_URL = f"http://localhost:{FASTAPI_PORT}/api/v1"
 
 st.title("Back Pain Tracker")
 
@@ -41,4 +48,4 @@ try:
     else:
         st.write("No entries yet.")
 except Exception as e:
-    st.error(f"Error fetching history: {str(e)}") 
+    st.error(f"Error fetching history: {str(e)}")
